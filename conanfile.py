@@ -94,9 +94,12 @@ class PROPOSALConan(ConanFile):
 
     def generate(self):
         tc = CMakeToolchain(self)
-        tc.cache_variables["BUILD_TESTING"] = bool(self.options.with_testing)
-        tc.cache_variables["BUILD_PYTHON"] = bool(self.options.with_python)
-        tc.cache_variables["BUILD_DOCUMENTATION"] = bool(self.options.with_documentation)
+        # tc.variables, not tc.cache_variables: cache variables are only written to
+        # CMakePresets.json, and cpp.yml configures CMake by hand passing nothing but
+        # -DCMAKE_TOOLCHAIN_FILE, so it would never see them.
+        tc.variables["BUILD_TESTING"] = bool(self.options.with_testing)
+        tc.variables["BUILD_PYTHON"] = bool(self.options.with_python)
+        tc.variables["BUILD_DOCUMENTATION"] = bool(self.options.with_documentation)
         tc.generate()
         deps = CMakeDeps(self)
         deps.generate()

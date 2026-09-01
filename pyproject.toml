@@ -55,6 +55,14 @@ test-command = "pytest {project}/tests/python -v"
 [tool.cibuildwheel.linux]
 manylinux-x86_64-image = "manylinux_2_28"
 manylinux-aarch64-image = "manylinux_2_28"
+# Boost arrives transitively through cubicinterpolation and is built with b2. The b2
+# binary ConanCenter ships for x86_64 links against glibc 2.32+, while manylinux_2_28
+# provides 2.28, so it cannot even start. Put a source-built b2 in the container's
+# Conan cache before the wheels are built, rather than raising the glibc floor for
+# every user by moving to a newer manylinux image. This cannot go in
+# `extra-arguments`, because conan-py-build appends those to `conan export-pkg` as
+# well and that command has no `--build` option.
+before-all = "pip install conan && conan profile detect --force && conan install --tool-requires='b2/[>=5.2 <6]' --build='b2/*' --output-folder=/tmp/b2-bootstrap"
 
 [tool.cibuildwheel.macos]
 environment = { MACOSX_DEPLOYMENT_TARGET = "11.0" }

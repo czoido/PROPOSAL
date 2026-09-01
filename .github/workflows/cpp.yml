@@ -25,8 +25,11 @@ jobs:
           id: cache-conan
           uses: actions/cache@v4
           with:
-            path: ~/.conan
-            key: ${{ runner.os }}-cache-conan-${{ matrix.compiler }}-${{ hashFiles('conanfile.py') }}-key
+            # ~/.conan is the Conan 1 home. Conan 2 uses ~/.conan2, so this step had
+            # been caching a directory that does not exist and every run rebuilt the
+            # whole dependency graph from source.
+            path: ~/.conan2
+            key: ${{ runner.os }}-cache-conan2-${{ matrix.compiler }}-${{ hashFiles('conanfile.py') }}-key
         - name: Cache build
           id: cache-build
           uses: actions/cache@v4
@@ -50,7 +53,11 @@ jobs:
           run: conan install . --build=missing -o with_testing=True
         - name: Call CMake
           if: ${{ matrix.os != 'windows-latest' }}
-          run: cmake . -DCMAKE_TOOLCHAIN_FILE=build/conan_toolchain.cmake
+          # Single-config generators need the build type passed here. Conan puts it on
+          # the CMake command line rather than in the toolchain, so configuring by hand
+          # without it leaves CMakeDeps with no configuration to look up. The Windows
+          # step below does not need it, because its generator is multi-config.
+          run: cmake . -DCMAKE_TOOLCHAIN_FILE=build/conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Release
         - name: Call CMake (Windows)
           if: ${{ matrix.os == 'windows-latest' }}
           run: cmake . -DCMAKE_TOOLCHAIN_FILE="build/conan_toolchain.cmake" -DCMAKE_POLICY_DEFAULT_CMP0091=NEW         
@@ -82,8 +89,8 @@ jobs:
           id: cache-conan
           uses: actions/cache@v4
           with:
-            path: ~/.conan
-            key: ${{ runner.os }}-cache-conan-${{ matrix.compiler }}-${{ hashFiles('conanfile.py') }}-key
+            path: ~/.conan2
+            key: ${{ runner.os }}-cache-conan2-${{ matrix.compiler }}-${{ hashFiles('conanfile.py') }}-key
         - name: Cache tests
           id: cache-tests
           uses: actions/cache@v4
