@@ -58,8 +58,8 @@ jobs:
           os:
             - ubuntu-latest
             - ubuntu-24.04-arm
-            - macos-13
-            - macos-14
+            - macos-15-intel
+            - macos-15
       steps:
       - uses: actions/checkout@v4
       # macOS only: on Linux cibuildwheel builds inside the manylinux container, which
@@ -71,17 +71,17 @@ jobs:
         with:
           path: ~/.conan2
           key: ${{ runner.os }}-${{ runner.arch }}-cache-conan2-${{ hashFiles('conanfile.py') }}-key
-      # Each interpreter recompiles PROPOSAL itself, so the full cp38-cp313 set only
+      # Each interpreter recompiles PROPOSAL itself, so the full cp39-cp313 set only
       # earns its runtime when the wheels are going to be published. One interpreter
       # is enough to show the cycle holds on a push or a pull request.
       - name: Build wheels (cp312 only)
         if: github.event_name != 'release'
-        uses: pypa/cibuildwheel@v2.23.3
+        uses: pypa/cibuildwheel@v3.4.0
         env:
           CIBW_BUILD: "cp312-*"
       - name: Build wheels (every interpreter in pyproject.toml)
         if: github.event_name == 'release'
-        uses: pypa/cibuildwheel@v2.23.3
+        uses: pypa/cibuildwheel@v3.4.0
       - uses: actions/upload-artifact@v4
         with:
           name: dist-${{ matrix.os }}
@@ -97,8 +97,8 @@ jobs:
           os:
             - ubuntu-latest
             - ubuntu-24.04-arm
-            - macos-13
-            - macos-14
+            - macos-15-intel
+            - macos-15
       steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

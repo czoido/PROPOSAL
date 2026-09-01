@@ -9,7 +9,7 @@ version = "7.6.2"
 description = "Monte Carlo simulation library to propagate leptons and gamma rays"
 readme = { file = "README.md", content-type = "text/markdown" }
 license-files = ["LICENSE.md"]
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 authors = [
     { name = "PROPOSAL Development Team", email = "jean-marco.alameddine@tu-dortmund.de" },
 ]
@@ -17,7 +17,6 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -46,7 +45,9 @@ packages = []
 include = ["tests", "profiles"]
 
 [tool.cibuildwheel]
-build = "cp38-* cp39-* cp310-* cp311-* cp312-* cp313-*"
+# cp38 is absent because cibuildwheel 3.x no longer builds it, Python 3.8 having
+# reached end of life in October 2024.
+build = "cp39-* cp310-* cp311-* cp312-* cp313-*"
 skip = ["*-musllinux*", "*_i686", "*-win32"]
 test-requires = "pytest"
 test-command = "pytest {project}/tests/python -v"
@@ -58,5 +59,8 @@ manylinux-aarch64-image = "manylinux_2_28"
 [tool.cibuildwheel.macos]
 environment = { MACOSX_DEPLOYMENT_TARGET = "11.0" }
 # profiles/macos.jinja pins the deployment target and the wheel platform tag, so the
-# wheel is not tagged with the (much newer) macOS version of the build runner.
-build-frontend = { name = "pip", args = ["--config-settings=host-profile=profiles/macos.jinja"] }
+# wheel is not tagged with the (much newer) macOS version of the build runner. The
+# profile derives the architecture from the runner, so the same one serves arm64 and
+# Intel. pypi_deploy.yml asserts the resulting tag, which is what catches this
+# setting failing to reach the backend.
+config-settings = { host-profile = "profiles/macos.jinja" }
