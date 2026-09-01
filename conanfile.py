@@ -1,13 +1,14 @@
 import os
+
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
 from conan.tools.build import check_min_cppstd
 from conan.tools.cmake import CMake, CMakeDeps, CMakeToolchain, cmake_layout
-from conan.tools.files import copy, get, rmdir
+from conan.tools.files import rmdir
 from conan.tools.microsoft import is_msvc
 from conan.tools.scm import Version
 
-required_conan_version = ">=1.53.0"
+required_conan_version = ">=2.0"
 
 
 class PROPOSALConan(ConanFile):
@@ -15,8 +16,7 @@ class PROPOSALConan(ConanFile):
     homepage = "https://github.com/tudo-astroparticlephysics/PROPOSAL"
     license = "LGPL-3.0"
     package_type = "library"
-    url = "https://github.com/conan-io/conan-center-index"
-    description = "monte Carlo based lepton and photon propagator"
+    description = "Monte Carlo simulation library to propagate leptons and gamma rays"
     topics = ("propagator", "lepton", "photon", "stochastic")
 
     settings = "os", "compiler", "build_type", "arch"
@@ -30,7 +30,7 @@ class PROPOSALConan(ConanFile):
     default_options = {
         "shared": False,
         "fPIC": True,
-        "with_python" : False,
+        "with_python": False,
         "with_testing": False,
         "with_documentation": False,
     }
@@ -42,7 +42,6 @@ class PROPOSALConan(ConanFile):
     @property
     def _minimum_compilers_version(self):
         return {
-            "Visual Studio": "15",
             "msvc": "191",
             "gcc": "5",
             "clang": "5",
@@ -70,13 +69,12 @@ class PROPOSALConan(ConanFile):
         # nlohmann_json: public headers include json.hpp and json_fwd.hpp
         self.requires("nlohmann_json/3.11.2", transitive_headers=True)
         if self.options.with_python:
-            self.requires("pybind11/2.10.1")
+            self.requires("pybind11/2.13.6")
         if self.options.with_testing:
             self.requires("boost/1.85.0")
             self.requires("gtest/1.16.0")
         if self.options.with_documentation:
             self.requires("doxygen/1.8.20")
-
 
     def validate(self):
         if is_msvc(self) and self.options.shared:
@@ -94,8 +92,14 @@ class PROPOSALConan(ConanFile):
                 f"{self.ref} requires C++{self._min_cppstd}, which your compiler does not support"
             )
 
-    def source(self):
-        get(self, **self.conan_data["sources"][self.version], strip_root=True)
+    def generate(self):
+        tc = CMakeToolchain(self)
+        tc.cache_variables["BUILD_TESTING"] = bool(self.options.with_testing)
+        tc.cache_variables["BUILD_PYTHON"] = bool(self.options.with_python)
+        tc.cache_variables["BUILD_DOCUMENTATION"] = bool(self.options.with_documentation)
+        tc.generate()
+        deps = CMakeDeps(self)
+        deps.generate()
 
     def build(self):
         cmake = CMake(self)
@@ -103,26 +107,17 @@ class PROPOSALConan(ConanFile):
         cmake.build()
 
     def package(self):
-        copy(self, "LICENSE.md", self.source_folder, os.path.join(self.package_folder, "licenses"))
         cmake = CMake(self)
         cmake.install()
-        rmdir(self, os.path.join(self.package_folder, "lib", "cmake"))
-
-    def generate(self):
-        tc = CMakeToolchain(self)
-        tc.variables["BUILD_TESTING"] = self.options.with_testing
-        tc.variables["BUILD_PYTHON"] = self.options.with_python
-        tc.variables["BUILD_DOCUMENTATION"] = self.options.with_documentation
-        tc.variables["CMAKE_BUILD_TYPE"] = "Release" # set as default
-        tc.generate()
-        deps = CMakeDeps(self)
-        deps.generate()
+        if self.options.with_python:
+            # conan-py-build copies the whole package folder into the wheel, and the
+            # wheel only needs proposal/_proposal.<ext>. Drop the C++ SDK artifacts
+            # (static library, headers, CMake config files) that cmake.install()
+            # also stages.
+            rmdir(self, os.path.join(self.package_folder, "lib"))
+            rmdir(self, os.path.join(self.package_folder, "include"))
 
     def package_info(self):
         self.cpp_info.set_property("cmake_file_name", "PROPOSAL")
         self.cpp_info.set_property("cmake_target_name", "PROPOSAL::PROPOSAL")
         self.cpp_info.libs = ["PROPOSAL"]
-
-        # TODO: to remove in conan v2 once cmake_find_package_* generators removed
-        self.cpp_info.names["cmake_find_package"] = "PROPOSAL"
-        self.cpp_info.names["cmake_find_package_multi"] = "PROPOSAL"

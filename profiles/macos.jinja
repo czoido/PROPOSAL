@@ -1,0 +1,11 @@
+{% set wheel_arch = "arm64" if platform.machine() == "arm64" else "x86_64" %}
+include(default)
+
+[settings]
+os.version=11.0
+
+[buildenv]
+# Pin the wheel's platform tag to the deployment target (os.version above). Otherwise
+# auto-detection uses the build machine's macOS version, which would tag the wheel too
+# high and make it uninstallable on older, still-supported macOS versions.
+WHEEL_ARCH=macosx_11_0_{{ wheel_arch }}

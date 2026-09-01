@@ -41,7 +41,7 @@ PROPOSAL is now a C++14 library using pybind11 Python bindings!
 
 ## Requirements
 
-- CMake 3.9 or higher (to build the tests CMake 3.10 is required)
+- CMake 3.18 or higher
 - C++14 compatible compiler (for gcc: version 5 and later; for clang: version 3.4 and later)
 
 Furthermore, you either need the package manager
@@ -57,6 +57,11 @@ If you are only interested in using PROPOSAL as a python library, the easiest wa
 ```
 pip install proposal
 ```
+
+Wheels are published for Linux and macOS. If no wheel matches your platform, pip
+builds PROPOSAL from source, which needs a C++14 compiler and CMake. All C++
+dependencies are fetched by [conan](https://conan.io) during the build, so there
+is nothing else to install by hand.
 
 Advanced install and compiling instructions, especially if you want to use PROPOSAL as a C++ library, are found in [install](INSTALL.md).
 

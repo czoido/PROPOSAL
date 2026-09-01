@@ -1,7 +1,7 @@
 # Installation
 
-The installation process is based on **CMake** (version `>3.9` required).
-To handle dependencies and for simple usage in other projects, the package manager **conan** (version `>1.33` required) can be used additionally.
+The installation process is based on **CMake** (version `>=3.18` required).
+To handle dependencies and for simple usage in other projects, the package manager **conan** (version `>=2.0` required) can be used additionally.
 If you are only interested to use PROPOSAL in python, you can install PROPOSAL using **pip**.
 
 All different installation approaches are going to be explained in the following.
@@ -69,8 +69,24 @@ If you only want to use PROPOSAL in Python, the easiest way is to use **pip**:
 $ pip install proposal
 ```
 
-This will install the most recent version of PROPOSAL. 
+This will install the most recent version of PROPOSAL.
 See the [pip documentation](https://pip.pypa.io/en/stable/) for more information.
+
+Wheels are published for Linux and macOS, so on those platforms nothing is
+compiled. On any other platform pip builds PROPOSAL from source. That build is
+driven by [conan-py-build](https://conan-py-build.conan.io), a build backend that
+runs conan and CMake for you, so a C++14 compiler and CMake are the only things
+you have to provide. Conan is installed by pip as a build dependency and fetches
+`spdlog`, `CubicInterpolation`, `nlohmann_json` and `pybind11` during the build.
+
+To build the wheel from a clone of the repository:
+
+```sh
+$ pip wheel . -w dist/
+```
+
+The bindings are linked statically, so the wheel contains only
+`proposal/_proposal.<ext>` and needs no shared library at runtime.
 
 ## Building using CMake (recommended for advanced users)
 
@@ -150,15 +166,10 @@ This section provides help for common problems during installation.
 If you have installed PROPOSAL using conan, check your conan profile for the `compiler.libcxx` setting, for example with
 
 ```sh
-$ cat .conan/profiles/default`
-``` 
-
-if you are using the default conan profile. This should be set to `libstdc++11`.
-If not, you can change this setting with
-
-```sh
-$ conan profile update settings.compiler.libcxx=libstdc++11 default
+$ conan profile show
 ```
 
-before installing for your default profile.
+if you are using the default conan profile. This should be set to `libstdc++11`.
+If not, edit `compiler.libcxx` in the profile before installing.
+`conan profile path default` prints where that file lives.
 

@@ -1,7 +1,0 @@
-include README.md LICENSE.md
-include pyproject.toml
-include conanfile.py
-global-include CMakeLists.txt *.cmake *.in
-recursive-include src *
-recursive-include tests *
-global-exclude .git*

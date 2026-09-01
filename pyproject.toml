@@ -1,8 +1,65 @@
 [build-system]
-requires = [
-    "setuptools>=45",
-    "wheel",
-    "cmake>=3.16",
-    "conan>=2.0.0",
+requires = ["conan-py-build>=0.6.2"]
+build-backend = "conan_py_build.build"
+
+[project]
+name = "proposal"
+dynamic = ["version"]
+description = "Monte Carlo simulation library to propagate leptons and gamma rays"
+readme = { file = "README.md", content-type = "text/markdown" }
+license-files = ["LICENSE.md"]
+requires-python = ">=3.8"
+authors = [
+    { name = "PROPOSAL Development Team", email = "jean-marco.alameddine@tu-dortmund.de" },
 ]
-build-backend = "setuptools.build_meta"
+classifiers = [
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Topic :: Scientific/Engineering :: Physics",
+    "Development Status :: 5 - Production/Stable",
+]
+
+[project.urls]
+Homepage = "https://github.com/tudo-astroparticlephysics/PROPOSAL"
+
+[tool.conan-py-build]
+# The C++ build defaults to no bindings, the wheel needs them.
+extra-arguments = ["-o=&:with_python=True"]
+
+[tool.conan-py-build.version]
+file = "python/proposal/__init__.py"
+
+[tool.conan-py-build.wheel]
+# Not src/proposal: it would collide with the C++ sources in src/PROPOSAL on
+# case-insensitive filesystems.
+packages = ["python/proposal"]
+
+[tool.conan-py-build.sdist]
+# python/proposal is added on its own: it is wheel.packages and it holds version.file.
+# profiles/ is not, because the macOS profile is passed as a config setting rather
+# than extra-profile, and the cibuildwheel config below names it.
+include = ["tests", "profiles"]
+
+[tool.cibuildwheel]
+build = "cp38-* cp39-* cp310-* cp311-* cp312-* cp313-*"
+skip = ["*-musllinux*", "*_i686", "*-win32"]
+test-requires = "pytest"
+test-command = "pytest {project}/tests/python -v"
+
+[tool.cibuildwheel.linux]
+manylinux-x86_64-image = "manylinux_2_28"
+manylinux-aarch64-image = "manylinux_2_28"
+
+[tool.cibuildwheel.macos]
+environment = { MACOSX_DEPLOYMENT_TARGET = "11.0" }
+# profiles/macos.jinja pins the deployment target and the wheel platform tag, so the
+# wheel is not tagged with the (much newer) macOS version of the build runner.
+build-frontend = { name = "pip", args = ["--config-settings=host-profile=profiles/macos.jinja"] }

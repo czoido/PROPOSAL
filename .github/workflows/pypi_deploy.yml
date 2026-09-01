@@ -1,27 +1,72 @@
 name: Deploy 🐍 pkg PROPOSAL
 
 on:
-  page_build:
   release:
     types:
       - created
+  workflow_dispatch:
 
 jobs:
 
-    build-n-publish:
-      name: Build and publish Python 🐍 distributions 📦 to PyPI
+    sdist:
+      name: Build source distribution 📦
       runs-on: ubuntu-latest
       steps:
-      - uses: actions/checkout@master
-      - name: Set up Python 3.8
-        uses: actions/setup-python@v1
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
-          python-version: 3.8
+          python-version: '3.12'
       - name: Install build
         run: python -m pip install build
       - name: Build source tarball
-        run: python -m build -s
+        run: python -m build --sdist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-sdist
+          path: dist/*.tar.gz
+
+    wheels:
+      name: Build wheels 📦 on ${{ matrix.os }}
+      runs-on: ${{ matrix.os }}
+      strategy:
+        fail-fast: false
+        matrix:
+          # No Windows runner: the Windows C++ build is covered by cpp.yml, but the
+          # bindings have never been built there. Add windows-latest once they are.
+          os:
+            - ubuntu-latest
+            - ubuntu-24.04-arm
+            - macos-13
+            - macos-14
+      steps:
+      - uses: actions/checkout@v4
+      # macOS only: on Linux cibuildwheel builds inside the manylinux container, which
+      # has its own conan cache. That cache is already shared by every Python version
+      # of the job, so the C++ dependencies are built once there anyway.
+      - name: Cache conan
+        if: runner.os == 'macOS'
+        uses: actions/cache@v4
+        with:
+          path: ~/.conan2
+          key: ${{ runner.os }}-${{ runner.arch }}-cache-conan2-${{ hashFiles('conanfile.py') }}-key
+      - name: Build wheels
+        uses: pypa/cibuildwheel@v2.23.3
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.os }}
+          path: wheelhouse/*.whl
+
+    publish:
+      name: Publish distributions 📦 to PyPI
+      needs: [sdist, wheels]
+      runs-on: ubuntu-latest
+      steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: dist-*
+          merge-multiple: true
+          path: dist
       - name: Publish distribution 📦 to PyPI
-        uses: pypa/gh-action-pypi-publish@master
+        uses: pypa/gh-action-pypi-publish@release/v1
         with:
           password: ${{ secrets.PYPI_API_TOKEN }}

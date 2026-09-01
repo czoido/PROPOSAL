@@ -161,3 +161,7 @@ cython_debug/
 # static files generated from Django application using `collectstatic`
 media
 static
+
+# conan-py-build / cibuildwheel
+CMakeUserPresets.json
+wheelhouse/

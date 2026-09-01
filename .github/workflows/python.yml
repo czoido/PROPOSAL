@@ -6,23 +6,23 @@ jobs:
     build:
       runs-on: ${{ matrix.os }}
       strategy:
+        fail-fast: false
         matrix:
-          include:
-            - os : "ubuntu-latest"
-            - os : "macos-latest"
+          os: ["ubuntu-latest", "macos-latest"]
       steps:
         - uses: actions/checkout@v4
+        - uses: actions/setup-python@v5
+          with:
+            python-version: '3.12'
         - name: Cache conan
           id: cache-conan
           uses: actions/cache@v4
           with:
-            path: ~/.conan
-            key: ${{ runner.os }}-cache-conan-${{ matrix.compiler }}-${{ hashFiles('conanfile.py') }}-key
-        - name: Install conan
-          run: python3 -m pip install --break-system-packages conan
+            path: ~/.conan2
+            key: ${{ runner.os }}-cache-conan2-${{ hashFiles('conanfile.py') }}-key
         - name: Install Python 🐍 distributions 📦
-          run: python3 -m pip install --break-system-packages .
+          run: python -m pip install . -v
         - name: Install pytest
-          run: python3 -m pip install --break-system-packages pytest
+          run: python -m pip install pytest
         - name: run pytest
-          run: python3 -m pytest tests/python -v
+          run: python -m pytest tests/python -v
