@@ -109,11 +109,12 @@ class PROPOSALConan(ConanFile):
     def package(self):
         cmake = CMake(self)
         cmake.install()
-        if self.options.with_python:
+        if self.options.with_python and not self.options.shared:
             # conan-py-build copies the whole package folder into the wheel, and the
-            # wheel only needs proposal/_proposal.<ext>. Drop the C++ SDK artifacts
-            # (static library, headers, CMake config files) that cmake.install()
-            # also stages.
+            # wheel only needs the proposal extension module that pyPROPOSAL installs
+            # at the root. Drop the C++ SDK artifacts (static library, headers, the
+            # exported CMake config) that cmake.install() also stages. Only safe for a
+            # static build: shared puts libPROPOSAL in lib/, where the module needs it.
             rmdir(self, os.path.join(self.package_folder, "lib"))
             rmdir(self, os.path.join(self.package_folder, "include"))
 

@@ -1,10 +1,20 @@
-name: Deploy 🐍 pkg PROPOSAL
+name: Build, verify and deploy 🐍 pkg PROPOSAL
 
 on:
+  push:
+    # Branches only. A release pushes a tag and fires `release` as well, and there is
+    # no reason to build the whole matrix twice for it.
+    branches:
+      - '**'
+  pull_request:
   release:
     types:
       - created
   workflow_dispatch:
+
+concurrency:
+  group: wheels-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
 
@@ -20,6 +30,18 @@ jobs:
         run: python -m pip install build
       - name: Build source tarball
         run: python -m build --sdist
+      - name: Check the sdist can rebuild itself
+        # A wheel can only be built from this tarball if it carries the Conan recipe
+        # and the CMake project. Nothing would notice their absence until someone
+        # installed the sdist, so assert it while the tarball is still here.
+        run: |
+          set -o pipefail
+          tar tzf dist/*.tar.gz | sed 's|^[^/]*/||' | sort > sdist-files.txt
+          for f in conanfile.py pyproject.toml CMakeLists.txt profiles/macos.jinja; do
+            grep -qx "$f" sdist-files.txt \
+              || { echo "::error::the sdist does not contain $f"; exit 1; }
+          done
+          echo "The sdist carries the Conan recipe, the CMake project and the profiles."
       - uses: actions/upload-artifact@v4
         with:
           name: dist-sdist
@@ -49,16 +71,149 @@ jobs:
         with:
           path: ~/.conan2
           key: ${{ runner.os }}-${{ runner.arch }}-cache-conan2-${{ hashFiles('conanfile.py') }}-key
-      - name: Build wheels
+      # Each interpreter recompiles PROPOSAL itself, so the full cp38-cp313 set only
+      # earns its runtime when the wheels are going to be published. One interpreter
+      # is enough to show the cycle holds on a push or a pull request.
+      - name: Build wheels (cp312 only)
+        if: github.event_name != 'release'
+        uses: pypa/cibuildwheel@v2.23.3
+        env:
+          CIBW_BUILD: "cp312-*"
+      - name: Build wheels (every interpreter in pyproject.toml)
+        if: github.event_name == 'release'
         uses: pypa/cibuildwheel@v2.23.3
       - uses: actions/upload-artifact@v4
         with:
           name: dist-${{ matrix.os }}
           path: wheelhouse/*.whl
 
+    verify-wheel:
+      name: Install wheel 🎡 on ${{ matrix.os }}
+      needs: wheels
+      runs-on: ${{ matrix.os }}
+      strategy:
+        fail-fast: false
+        matrix:
+          os:
+            - ubuntu-latest
+            - ubuntu-24.04-arm
+            - macos-13
+            - macos-14
+      steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist-${{ matrix.os }}
+          path: wheelhouse
+      - name: Wheels built for this platform
+        run: ls -1 wheelhouse
+      - name: macOS wheels carry the deployment target, not the runner's version
+        # MACOSX_DEPLOYMENT_TARGET and profiles/macos.jinja pin both the build and the
+        # tag to 11.0. Left to auto-detection the tag follows the runner, which quietly
+        # makes the wheel uninstallable on older but still supported macOS versions.
+        if: runner.os == 'macOS'
+        run: |
+          for w in wheelhouse/*.whl; do
+            case "$w" in
+              *macosx_11_0_*) ;;
+              *) echo "::error::$w is not tagged macosx_11_0_*"; exit 1 ;;
+            esac
+          done
+      - name: The wheel holds the extension module, and no stale package directory
+        run: |
+          python - <<'PY'
+          import glob, sys, zipfile
+
+          suffixes = (".so", ".pyd", ".dylib")
+          problems = []
+
+          wheels = sorted(glob.glob("wheelhouse/*.whl"))
+          if not wheels:
+              problems.append("no wheel was produced")
+
+          for wheel in wheels:
+              names = zipfile.ZipFile(wheel).namelist()
+              print(f"--- {wheel}")
+              print("\n".join(f"    {n}" for n in names))
+              if not [n for n in names if n.startswith("proposal.") and n.endswith(suffixes)]:
+                  problems.append(f"{wheel} has no top-level proposal extension module")
+              if [n for n in names if n.startswith("proposal/")]:
+                  problems.append(f"{wheel} has a proposal/ directory, which would shadow the module")
+              if not [n for n in names if n.endswith(".dist-info/METADATA")]:
+                  problems.append(f"{wheel} has no metadata")
+
+          # Workflow commands are read from stdout, so annotate before exiting.
+          for problem in problems:
+              print(f"::error::{problem}", flush=True)
+          sys.exit(1 if problems else 0)
+          PY
+      - name: Install from the wheel alone, with no index and no toolchain
+        # --no-index proves the install needs nothing beyond the artifact: no PyPI, no
+        # Conan, no compiler. This is the path nearly every user takes.
+        run: |
+          python -m pip install --no-index --find-links wheelhouse proposal
+          python -m pip install pytest
+      - name: Run the test suite against the installed wheel
+        # From outside the checkout, so the import cannot resolve to the source tree.
+        run: |
+          cd "${{ runner.temp }}"
+          python -c "import proposal; print(proposal.__file__)"
+          python -m pytest "${{ github.workspace }}/tests/python" -v
+
+    verify-sdist:
+      name: Install sdist 📦 in a clean image
+      needs: sdist
+      runs-on: ubuntu-latest
+      container:
+        image: python:3.12-slim
+      defaults:
+        run:
+          shell: bash
+      steps:
+      - name: Install a C++ toolchain, and nothing PROPOSAL depends on
+        run: |
+          apt-get update -qq
+          apt-get install -y --no-install-recommends build-essential cmake git ca-certificates
+          for h in spdlog/spdlog.h nlohmann/json.hpp pybind11/pybind11.h CubicInterpolation/Interpolant.h; do
+            for prefix in /usr/include /usr/local/include; do
+              if [ -e "$prefix/$h" ]; then
+                echo "::error::$prefix/$h already exists, this job would prove nothing"
+                exit 1
+              fi
+            done
+          done
+          echo "None of PROPOSAL's C++ dependencies are installed. Conan has to supply them."
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist-sdist
+          path: dist
+      - name: pip install the sdist
+        # No conan install beforehand, and no default profile in the image. The backend
+        # detects one, resolves the graph from ConanCenter and builds what is missing.
+        # Deliberately uncached, so the job keeps measuring a first install.
+        run: |
+          set -o pipefail
+          pip install --no-cache-dir -v dist/proposal-*.tar.gz 2>&1 | tee install.log
+      - name: Conan supplied the dependencies during the build
+        run: |
+          grep -qiE "conancenter|(spdlog|nlohmann_json|cubicinterpolation|pybind11)/[0-9]" install.log \
+            || { echo "::error::the log shows no sign of Conan resolving the graph"; exit 1; }
+      - name: Run the test suite that shipped in the sdist
+        run: |
+          pip install pytest
+          mkdir -p /tmp/sdist
+          tar xzf dist/proposal-*.tar.gz -C /tmp/sdist --strip-components=1
+          cd /tmp
+          python -c "import proposal; print(proposal.__file__)"
+          python -m pytest /tmp/sdist/tests/python -v
+
     publish:
       name: Publish distributions 📦 to PyPI
-      needs: [sdist, wheels]
+      if: github.event_name == 'release'
+      needs: [verify-wheel, verify-sdist]
       runs-on: ubuntu-latest
       steps:
       - uses: actions/download-artifact@v4
