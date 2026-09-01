@@ -42,7 +42,7 @@ void init_scattering(py::module& m);
 void init_math(py::module&);
 void init_secondaries(py::module&);
 
-PYBIND11_MODULE(_proposal, m)
+PYBIND11_MODULE(proposal, m)
 {
     m.doc() = R"pbdoc(
         .. currentmodule:: proposal

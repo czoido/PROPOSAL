@@ -1,10 +1,11 @@
 [build-system]
-requires = ["conan-py-build>=0.6.2"]
+requires = ["conan-py-build>=0.6.3"]
 build-backend = "conan_py_build.build"
 
 [project]
 name = "proposal"
-dynamic = ["version"]
+# Keep in sync with PROPOSAL_VERSION_* in CMakeLists.txt.
+version = "7.6.2"
 description = "Monte Carlo simulation library to propagate leptons and gamma rays"
 readme = { file = "README.md", content-type = "text/markdown" }
 license-files = ["LICENSE.md"]
@@ -34,18 +35,14 @@ Homepage = "https://github.com/tudo-astroparticlephysics/PROPOSAL"
 # The C++ build defaults to no bindings, the wheel needs them.
 extra-arguments = ["-o=&:with_python=True"]
 
-[tool.conan-py-build.version]
-file = "python/proposal/__init__.py"
-
 [tool.conan-py-build.wheel]
-# Not src/proposal: it would collide with the C++ sources in src/PROPOSAL on
-# case-insensitive filesystems.
-packages = ["python/proposal"]
+# The wheel is a single top-level extension module, with no pure-Python package.
+# CMake installs it at the root of the Conan package folder.
+packages = []
 
 [tool.conan-py-build.sdist]
-# python/proposal is added on its own: it is wheel.packages and it holds version.file.
-# profiles/ is not, because the macOS profile is passed as a config setting rather
-# than extra-profile, and the cibuildwheel config below names it.
+# profiles/ is not added on its own, because the macOS profile is passed as a config
+# setting rather than extra-profile, and the cibuildwheel config below names it.
 include = ["tests", "profiles"]
 
 [tool.cibuildwheel]

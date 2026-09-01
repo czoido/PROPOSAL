@@ -85,8 +85,8 @@ To build the wheel from a clone of the repository:
 $ pip wheel . -w dist/
 ```
 
-The bindings are linked statically, so the wheel contains only
-`proposal/_proposal.<ext>` and needs no shared library at runtime.
+The bindings are linked statically, so the wheel contains only the extension module
+`proposal.<ext>` and needs no shared library at runtime.
 
 ## Building using CMake (recommended for advanced users)
 
