@@ -53,20 +53,19 @@ jobs:
       strategy:
         fail-fast: false
         matrix:
-          # No Windows runner: the Windows C++ build is covered by cpp.yml, but the
-          # bindings have never been built there. Add windows-latest once they are.
           os:
             - ubuntu-latest
             - ubuntu-24.04-arm
             - macos-15-intel
             - macos-15
+            - windows-latest
       steps:
       - uses: actions/checkout@v4
-      # macOS only: on Linux cibuildwheel builds inside the manylinux container, which
+      # Not on Linux: there cibuildwheel builds inside the manylinux container, which
       # has its own conan cache. That cache is already shared by every Python version
       # of the job, so the C++ dependencies are built once there anyway.
       - name: Cache conan
-        if: runner.os == 'macOS'
+        if: runner.os != 'Linux'
         uses: actions/cache@v4
         with:
           path: ~/.conan2
@@ -99,6 +98,12 @@ jobs:
             - ubuntu-24.04-arm
             - macos-15-intel
             - macos-15
+            - windows-latest
+      # These steps are shell scripts, and the Windows runner would otherwise hand
+      # them to PowerShell.
+      defaults:
+        run:
+          shell: bash
       steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -158,10 +163,13 @@ jobs:
           python -m pip install pytest
       - name: Run the test suite against the installed wheel
         # From outside the checkout, so the import cannot resolve to the source tree.
+        # mktemp rather than runner.temp: under Git Bash the latter is a backslash
+        # path that cd would mangle.
         run: |
-          cd "${{ runner.temp }}"
+          tests="$PWD/tests/python"
+          cd "$(mktemp -d)"
           python -c "import proposal; print(proposal.__file__)"
-          python -m pytest "${{ github.workspace }}/tests/python" -v
+          python -m pytest "$tests" -v
 
     verify-sdist:
       name: Install sdist 📦 in a clean image
