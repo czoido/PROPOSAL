@@ -4,7 +4,7 @@ build-backend = "conan_py_build.build"
 
 [project]
 name = "proposal"
-# Keep in sync with PROPOSAL_VERSION_* in CMakeLists.txt.
+# Keep in sync with PROPOSAL_VERSION_* in CMakeLists.txt
 version = "7.6.2"
 description = "Monte Carlo simulation library to propagate leptons and gamma rays"
 readme = { file = "README.md", content-type = "text/markdown" }

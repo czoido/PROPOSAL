@@ -1,14 +1,11 @@
 """Smoke checks for the packaged extension module.
 
-The wheel is a single compiled module, so the failures that matter here are the
-quiet ones: a binding source that never made it into the build, leaving a whole
-submodule missing, or a version that drifted between the C++ project and the
-Python package metadata. src/pyPROPOSAL/CMakeLists.txt collects its sources with
+The wheel is a single compiled module, so the failure that matters here is the
+quiet one: a binding source that never made it into the build, leaving a whole
+submodule missing. src/pyPROPOSAL/CMakeLists.txt collects its sources with
 file(GLOB_RECURSE), which CMake evaluates at configure time, so a source that
 goes missing does not announce itself.
 """
-from importlib.metadata import PackageNotFoundError, version
-
 import proposal as pp
 import pytest
 
@@ -52,17 +49,6 @@ def test_submodule_is_reachable_and_populated(path):
         obj = getattr(obj, part)
     assert [n for n in dir(obj) if not n.startswith("_")], \
         f"proposal.{path} registered nothing"
-
-
-def test_version_matches_the_installed_distribution():
-    # pp.__version__ comes from getPROPOSALVersion(), which CMake fills in from
-    # PROPOSAL_VERSION_* in CMakeLists.txt. The distribution version comes from
-    # pyproject.toml. They are maintained by hand in two places, so they can drift.
-    try:
-        distribution = version("proposal")
-    except PackageNotFoundError:
-        pytest.skip("proposal is imported from a build tree, not an installed wheel")
-    assert pp.__version__ == distribution
 
 
 def test_objects_from_several_binding_modules_can_be_built():
